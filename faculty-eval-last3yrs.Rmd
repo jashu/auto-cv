@@ -1,0 +1,185 @@
+---
+name: Jason
+surname: Shumake
+position: "Research Assistant Professor of Psychology"
+phone: "+1 xxx-xxx-xxxx"
+email: "shumake@utexas.edu"
+date: "`r format(Sys.time(), '%B %Y')`"
+headcolor: 424242
+output: vitae::awesomecv
+papersize: letter
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+library(tidyverse) # collection of general data processing tools
+library(vitae) # workhorse function for generating the formatted CV as PDF
+library(rorcid) # interfaces with ORCID API
+library(scales) # needed to format funding amounts in currency units
+library(glue) # provides syntactic sugar for pasting together strings
+library(rcrossref) # interfaces with CrossRef API 
+                   # (IMPORTANT--current CRAN version DOES NOT WORK
+                   #  Must install development version from GitHub)
+orcid <- "0000-0003-4655-436X"
+current_year <- as.integer(format(Sys.Date(), "%Y"))
+# Start CV 3 years prior to current year
+start_year <- current_year - 3L
+```
+
+```{r, eval = FALSE}
+x <- orcid_auth()
+x
+# the token returned here needs to be saved into the .Renviron file
+# so that it is available when the document gets knitted.
+# On Mac (or Linux) this is a hidden file located in the home directory.
+# Add the following line to the .Renviron file: e.g.,
+# ORCID_TOKEN = dc0a6b6b-b4d4-4276-bc89-78c1e9ede56e
+# substituting the token above with whatever is returned here:
+```
+
+```{r}
+activities <- orcid_activities(orcid)
+distinctions <- pluck(
+  activities, 1, "distinctions", "affiliation-group", "summaries"
+) %>% reduce(bind_rows)
+fundings <- pluck(activities, 1, "fundings", "group", "funding-summary") %>%
+  reduce(bind_rows) %>%
+  filter(`end-date.year.value` >= start_year)
+amounts <- map(fundings$`put-code`, ~ orcid_fundings(orcid, .x)) %>% 
+  reduce(c) %>%
+  map_chr(~ dollar(as.integer(.x$amount$value)))
+fundings <- fundings  %>%
+  mutate(
+    amount = amounts,
+    grantno = map(`external-ids.external-id`, "external-id-value"),
+    grantno = map_chr(grantno, ~ {if(is.null(.x)) "" else .x}),
+    role = case_when(
+      grepl("^F", grantno) ~ "NRSA Fellow",
+      grepl("^R", grantno) ~ "CO-I",
+      TRUE ~ "PI"
+    )
+  ) %>%
+  filter
+services <- pluck(
+  activities, 1, "services", "affiliation-group", "summaries"
+) %>% reduce(bind_rows) %>%
+  filter(`service-summary.end-date.year.value` >= start_year | 
+           is.na(`service-summary.end-date.year.value`))
+
+# For peer reviews, the ORCID query does not return name of journal, but rather
+# the ISSN <grumble, grumble!>, so we have to look up the ISSN, which the 
+# following vectorized function does:
+find_journal <- function(x){
+  issn <- unique(x)
+  # first try crossref which is faster but may not have all ISSNs
+  jrnl <- map(issn, cr_journals) %>% map(pluck, "data", "title") %>%
+    map_chr(~ {if(is.null(.x)) NA_character_ else .x})
+  # for any missing journals, scrape issn.org. 
+  # (their API requires paid subscription, but web searches are free)
+  path <- paste(
+    'https://portal.issn.org/resource/ISSN/', issn[is.na(jrnl)], sep = ''
+  )
+  jrnl[is.na(jrnl)] <- map_chr(path, function(x){
+    out <- xml2::read_html(x) %>% rvest::html_nodes("p") %>% rvest::html_text()
+    out <- out[grep("Title proper", out)]
+    out <- gsub("Title proper: ", "", out) %>% tools::toTitleCase()
+    substr(out, 1, nchar(out)-1)
+  })
+  names(jrnl) <- issn
+  jrnl[x]
+  # may be good idea to plan for contingency if journal name is missing from
+  # both crossref and issn.org
+}
+```
+
+
+# Publications
+
+## Journal Articles
+
+```{r}
+all_works <- works(orcid) %>% 
+  as_tibble() %>%
+  mutate(year = as.integer(`publication-date.year.value`)) %>%
+  filter(year >= start_year)
+types <- all_works$type
+class(all_works) <- c(class(all_works), "works")
+```
+
+```{r}
+dois <- identifiers(all_works, "doi") %>% unique
+pubs <- cr_cn(dois, format = "bibtex") %>% unique
+pubs2 <- imap(pubs, ~ gsub("@article\\{", paste("@article{", .y, sep = ""), .x))
+if("pubs.bib" %in% list.files()) unlink("pubs.bib")
+walk(pubs2, write, file = "pubs.bib", append = TRUE)
+```
+
+```{r publications}
+bibliography_entries("pubs.bib")
+```
+
+&nbsp;
+
+# Professional Presentations
+
+```{r talks}
+talks <- all_works$type == "lecture-speech"
+all_works[talks,] %>%
+  detailed_entries(
+    with = `title.title.value`,
+    when = `publication-date.year.value`,
+    what = `journal-title.value`,
+    why = `title.subtitle`
+  )
+```
+
+&nbsp;
+
+# Distinctions
+
+```{r distinctions}
+distinctions %>% detailed_entries(
+    with = `distinction-summary.role-title`,
+    when = `distinction-summary.start-date.year.value`,
+    what = `distinction-summary.organization.name`,
+    where = glue("{`distinction-summary.organization.address.city`}, 
+                 {`distinction-summary.organization.address.country`}")
+  ) %>% filter(when >= start_year)
+```
+
+&nbsp;
+
+
+# Funding
+
+```{r, funding}
+fundings %>%
+  arrange(desc(`end-date.year.value`), desc(`start-date.year.value`)) %>%
+  mutate(organization.name = case_when(
+    organization.name == "National Institute of Mental Health" ~ "NIMH",
+    TRUE ~ organization.name)
+  ) %>%
+  detailed_entries(
+    with = title.title.value,
+    when = glue("{`start-date.year.value`} - {`end-date.year.value`}"),
+    what = glue::glue("Role: {role}; Funding: {amount}"),
+    where = glue::glue("{organization.name}, {grantno}")
+  )
+```
+
+# Service
+
+```{r service}
+services %>%
+  detailed_entries(
+    with = `service-summary.organization.name`,
+    when = glue("{`service-summary.start-date.year.value`} -
+                {`service-summary.end-date.year.value`}"),
+    what = `service-summary.role-title`,
+    where = glue("{`service-summary.organization.address.city`}, 
+                 {`service-summary.organization.address.country`}")
+  )
+```
+
+
+
