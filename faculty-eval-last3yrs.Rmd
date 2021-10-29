@@ -1,8 +1,10 @@
 ---
-name: Jason
-surname: Shumake
-position: "Research Assistant Professor of Psychology"
-email: "shumake@utexas.edu"
+name: "&nbsp;" # replace with your first name
+surname: "&nbsp;" # replace with your last name here
+email: "&nbsp;" # replace with your email
+# the above fields must be included to avoid error; for additional ones that
+# you can include (e.g., position, address, profilepic, website) see the
+# "Introduction to vitae" vignette.
 date: "`r format(Sys.time(), '%B %Y')`"
 headcolor: 424242
 output: vitae::awesomecv
@@ -40,30 +42,34 @@ x
 activities <- orcid_activities(orcid)
 distinctions <- pluck(
   activities, 1, "distinctions", "affiliation-group", "summaries"
-) %>% reduce(bind_rows)
-fundings <- pluck(activities, 1, "fundings", "group", "funding-summary") %>%
-  reduce(bind_rows) %>%
-  filter(`end-date.year.value` >= start_year)
-amounts <- map(fundings$`put-code`, ~ orcid_fundings(orcid, .x)) %>% 
-  reduce(c) %>%
-  map_chr(~ dollar(as.integer(.x$amount$value)))
-fundings <- fundings  %>%
-  mutate(
-    amount = amounts,
-    grantno = map(`external-ids.external-id`, "external-id-value"),
-    grantno = map_chr(grantno, ~ {if(is.null(.x)) "" else .x}),
-    role = case_when(
-      grepl("^F", grantno) ~ "NRSA Fellow",
-      grepl("^R", grantno) ~ "CO-I",
-      TRUE ~ "PI"
+) 
+if(!is.null(distinctions)){
+  distinctions <- distinctions %>% reduce(bind_rows)
+}
+fundings <- pluck(activities, 1, "fundings", "group", "funding-summary") 
+if(!is.null(fundings)){
+  fundings <- fundings %>% 
+    reduce(bind_rows) %>%
+    filter(`end-date.year.value` >= start_year)
+  amounts <- map(fundings$`put-code`, ~ orcid_fundings(orcid, .x)) %>% 
+    reduce(c) %>%
+   map_chr(~ dollar(as.integer(.x$amount$value)))
+  fundings <- fundings  %>%
+    mutate(
+      amount = amounts,
+      grantno = map(`external-ids.external-id`, "external-id-value"),
+      grantno = map_chr(grantno, ~ {if(is.null(.x)) "" else .x})
     )
-  ) %>%
-  filter
+}
+  
 services <- pluck(
   activities, 1, "services", "affiliation-group", "summaries"
-) %>% reduce(bind_rows) %>%
+) 
+if(!is.null(services)){
+  services <- services %>% reduce(bind_rows) %>%
   filter(`service-summary.end-date.year.value` >= start_year | 
            is.na(`service-summary.end-date.year.value`))
+}
 
 # For peer reviews, the ORCID query does not return name of journal, but rather
 # the ISSN <grumble, grumble!>, so we have to look up the ISSN, which the 
@@ -152,32 +158,37 @@ distinctions %>% detailed_entries(
 # Funding
 
 ```{r, funding}
-fundings %>%
-  arrange(desc(`end-date.year.value`), desc(`start-date.year.value`)) %>%
-  mutate(organization.name = case_when(
-    organization.name == "National Institute of Mental Health" ~ "NIMH",
-    TRUE ~ organization.name)
-  ) %>%
-  detailed_entries(
-    with = title.title.value,
-    when = glue("{`start-date.year.value`} - {`end-date.year.value`}"),
-    what = glue::glue("Role: {role}; Funding: {amount}"),
-    where = glue::glue("{organization.name}, {grantno}")
-  )
+if(!is.null(fundings)){
+  fundings %>%
+    arrange(desc(`end-date.year.value`), desc(`start-date.year.value`)) %>%
+    mutate(organization.name = case_when(
+      organization.name == "National Institute of Mental Health" ~ "NIMH",
+      TRUE ~ organization.name)
+    ) %>%
+    detailed_entries(
+      with = title.title.value,
+      when = glue("{`start-date.year.value`} - {`end-date.year.value`}"),
+      what = glue::glue("Funding: {amount}"),
+      where = glue::glue("{organization.name}, {grantno}")
+    )
+}
 ```
+&nbsp;
 
 # Service
 
 ```{r service}
-services %>%
-  detailed_entries(
-    with = `service-summary.organization.name`,
-    when = glue("{`service-summary.start-date.year.value`} -
-                {`service-summary.end-date.year.value`}"),
-    what = `service-summary.role-title`,
-    where = glue("{`service-summary.organization.address.city`}, 
-                 {`service-summary.organization.address.country`}")
-  )
+if(!is.null(services)){
+  services %>%
+    detailed_entries(
+      with = `service-summary.organization.name`,
+      when = glue("{`service-summary.start-date.year.value`} -
+                  {`service-summary.end-date.year.value`}"),
+      what = `service-summary.role-title`,
+      where = glue("{`service-summary.organization.address.city`}, 
+                   {`service-summary.organization.address.country`}")
+    )
+}
 ```
 
 
