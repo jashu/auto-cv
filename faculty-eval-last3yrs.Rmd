@@ -2,7 +2,6 @@
 name: Jason
 surname: Shumake
 position: "Research Assistant Professor of Psychology"
-phone: "+1 xxx-xxx-xxxx"
 email: "shumake@utexas.edu"
 date: "`r format(Sys.time(), '%B %Y')`"
 headcolor: 424242
