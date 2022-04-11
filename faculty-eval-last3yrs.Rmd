@@ -165,18 +165,241 @@ class(all_works) <- c(class(all_works), "works")
 ```
 
 ```{r}
-dois <- identifiers(all_works, "doi") %>% unique
-pubs <- cr_cn(dois, format = "bibtex") %>% unique
-pubs2 <- imap(pubs, ~ gsub("@article\\{", paste("@article{", .y, sep = ""), .x))
-if("pubs.bib" %in% list.files()) unlink("pubs.bib")
-walk(pubs2, write, file = "pubs.bib", append = TRUE)
+articles <- all_works[types == "journal-article",]
+if(nrow(articles) > 0){
+  has_doi <- !map_lgl(articles$`external-ids.external-id`, is_empty)
+  has_pmc <- has_doi
+  has_doi[has_doi] <- map_lgl(
+    articles$`external-ids.external-id`[has_doi],
+    ~ "doi" %in% .x$`external-id-type`
+  )
+  has_pmc[has_pmc] <- map_lgl(
+    articles$`external-ids.external-id`[has_pmc],
+    ~ "pmc" %in% .x$`external-id-type`
+  )
+  pubs3 <- NULL
+  if(any(has_doi | has_pmc)){
+    doi_articles <- articles[has_doi | has_pmc,]
+    dois <- map_chr(
+      doi_articles$`external-ids.external-id`,
+      function(x){
+        if("doi" %in% x$`external-id-type`){
+          x <- x[x$`external-id-type` == "doi", "external-id-value"] %>%
+            map_chr(~.x[1])
+          x[1]
+        } else {
+          doi <- id_converter(
+            x[x$`external-id-type` == "pmc", "external-id-value"], "pmcid"
+          )$records$doi
+          if(is.null(doi)) NA_character_ else doi
+        }
+      }
+    )
+    doi_articles <- doi_articles[!is.na(dois),]
+    dois <- dois[!is.na(dois)]
+    doi_articles <- doi_articles[!duplicated(tolower(dois)),]
+    dois <- unique(tolower(dois))
+    pubs <- cr_cn(dois, format = "bibtex")
+    prob_pubs <- !grepl("journal =", pubs)
+    if(any(prob_pubs) && "journal-title.value" %in% names(doi_articles)){
+      pubs <- gsub("^@misc", "@article", pubs)
+      pubs[prob_pubs] <- map2(
+        pubs[prob_pubs],
+        doi_articles$`journal-title.value`[prob_pubs],
+        ~ gsub(
+          "\n}$", 
+          paste0(",\n\tjournal = {", .y, "}\n}", collapse = ""), 
+          .x
+        )
+      )
+    }
+    doi_articles <- doi_articles[grepl("journal =", pubs),]
+    pubs <- pubs[grepl("journal =", pubs)]
+    pubs2 <- imap(
+      pubs, 
+      ~ gsub("@article\\{", paste("@article{", .y, sep = ""), .x)
+    )
+    pubs3 <- map2(
+      doi_articles$year, 
+      pubs2,
+    ~ gsub("year = ....", paste("year =", .x), .y)
+    )
+  }
+  ref <- NULL
+  if(any(!has_doi & !has_pmc)){
+    articles <- articles[!has_doi & !has_pmc,]
+    ref <- map(
+      1:nrow(articles),
+      ~ with(
+        articles,
+        bibentry(
+          bibtype = "Article",
+          title = title.title.value[.x],
+          author = `source.source-name.value`[.x],
+          journal = ifelse(
+            is.na(`journal-title.value`[.x]), 
+            ".",
+            `journal-title.value`[.x]
+          ),
+          year = `publication-date.year.value`[.x],
+          key = .x
+        )
+      )
+    ) %>% map(format, style = "Bibtex")
+  }
+  pubs <- c(pubs3, ref)
+  if("pubs.bib" %in% list.files()) unlink("pubs.bib")
+  walk(pubs, write, file = "pubs.bib", append = TRUE)
+  bibliography_entries("pubs.bib")
+}
 ```
 
-```{r publications}
-bibliography_entries("pubs.bib")
+## Preprints
+
+```{r}
+preprints <- all_works[types == "preprint",]
+if(nrow(preprints) > 0){
+  has_doi <- !map_lgl(preprints$`external-ids.external-id`, is_empty)
+  has_doi[has_doi] <- map_lgl(
+    preprints$`external-ids.external-id`[has_doi],
+    ~ "doi" %in% .x$`external-id-type`
+  )
+  pubs3 <- NULL
+  if(any(has_doi)){
+    doi_preprints <- preprints[has_doi,]
+    dois <- map_chr(
+      doi_preprints$`external-ids.external-id`,
+      function(x){
+        if("doi" %in% x$`external-id-type`){
+          x <- x[x$`external-id-type` == "doi", "external-id-value"] %>%
+            map_chr(~ sort(.x, decreasing = TRUE)[1])
+          sort(x, decreasing = TRUE)[1]
+        } else {
+          doi <- id_converter(
+            x[x$`external-id-type` == "pmc", "external-id-value"], "pmcid"
+          )$records$doi
+          if(is.null(doi)) NA_character_ else doi
+        }
+      }
+    )
+    doi_preprints <- doi_preprints[!duplicated(dois),]
+    dois <- unique(dois)
+    pubs <- cr_cn(dois, format = "bibtex")
+    pubs2 <- imap(
+      pubs, 
+      ~ gsub("@article\\{", paste("@article{", .y, sep = ""), .x)
+    )
+    pubs3 <- map2(
+      doi_preprints$year, 
+      pubs2,
+      ~ gsub("year = ....", paste("year =", .x), .y)
+    )
+  }
+  ref <- NULL
+  if(any(!has_doi)){
+    preprints <- preprints[!has_doi,]
+    ref <- map(
+      1:nrow(preprints),
+      ~ with(
+        preprints,
+        bibentry(
+          bibtype = "Article",
+          title = title.title.value[.x],
+          author = `source.source-name.value`[.x],
+          journal = ifelse(
+            is.na(`journal-title.value`[.x]), 
+            ".",
+            `journal-title.value`[.x]
+          ),
+          year = `publication-date.year.value`[.x],
+          key = .x
+        )
+      )
+    ) %>% map(format, style = "Bibtex")
+  }
+  pubs <- c(pubs3, ref)
+  if("preprints.bib" %in% list.files()) unlink("preprints.bib")
+  walk(pubs, write, file = "preprints.bib", append = TRUE)
+  bibliography_entries("preprints.bib")
+}
 ```
 
-&nbsp;
+## Books
+
+```{r books}
+if("book" %in% types){
+  books <- all_works[types == "book",]
+  bref <- map(
+    1:nrow(books),
+    ~ with(
+      books,
+      bibentry(
+        bibtype = "Book",
+        title = title.title.value[.x],
+        author = `source.source-name.value`[.x],
+        publisher = `journal-title.value`[.x],
+        year = `publication-date.year.value`[.x],
+        key = .x
+      )
+    )
+  ) %>% map(format, style = "Bibtex")
+  if("books.bib" %in% list.files()) unlink("books.bib")
+  walk(bref, write, file = "books.bib", append = TRUE)
+  bibliography_entries("books.bib")
+}
+```
+
+## Book Chapters
+
+```{r}
+if("book-chapter" %in% types){
+  chapters <- all_works[types == "book-chapter",]
+  has_doi <- !map_lgl(chapters$`external-ids.external-id`, is_empty)
+  has_doi[has_doi] <- map_lgl(
+    chapters$`external-ids.external-id`[has_doi],
+    ~ "doi" %in% .x$`external-id-type`
+  )
+  pubs3 <- NULL
+  if(any(has_doi)){
+    doi_chapters <- chapters[has_doi,]
+    dois <- identifiers(doi_chapters, "doi")
+    doi_chapters <- doi_chapters[!duplicated(dois),]
+    pubs <- cr_cn(unique(dois), format = "bibtex")
+    pubs2 <- imap(
+      pubs, 
+      ~ gsub("@article\\{", paste("@article{", .y, sep = ""), .x)
+    )
+    pubs3 <- map2(
+      doi_chapters$year, 
+      pubs2,
+      ~ gsub("year = ....", paste("year =", .x), .y)
+    )
+  }
+  ref <- NULL
+  if(any(!has_doi)){
+    chapters <- chapters[!has_doi,]
+    ref <- map(
+      1:nrow(chapters),
+      ~ with(
+        chapters,
+        bibentry(
+          bibtype = "InCollection",
+          title = title.title.value[.x],,
+          author = `source.source-name.value`[.x],
+          booktitle = `journal-title.value`[.x],
+          year = `publication-date.year.value`[.x],
+          publisher = ".",
+          key = .x
+        )
+      )
+    ) %>% map(format, style = "Bibtex")
+  }
+  pubs <- c(pubs3, ref)
+  if("chaps.bib" %in% list.files()) unlink("chaps.bib")
+  walk(pubs, write, file = "chaps.bib", append = TRUE)
+  bibliography_entries("chaps.bib")
+}
+```
 
 # Professional Presentations
 
