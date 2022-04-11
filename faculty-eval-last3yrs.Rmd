@@ -413,7 +413,8 @@ if("book-chapter" %in% types){
 # Professional Presentations
 
 ```{r talks}
-talks <- all_works$type == "lecture-speech"
+if("lecture-speech" %in% types){
+talks <- types == "lecture-speech"
 all_works[talks,] %>%
   detailed_entries(
     with = `title.title.value`,
@@ -421,24 +422,24 @@ all_works[talks,] %>%
     what = `journal-title.value`,
     why = `title.subtitle`
   )
+}
 ```
 
 &nbsp;
 
-# Distinctions
+# Honors
 
 ```{r distinctions}
-distinctions %>% detailed_entries(
+if(!is.null(distinctions)){
+  distinctions %>% detailed_entries(
     with = `distinction-summary.role-title`,
     when = `distinction-summary.start-date.year.value`,
     what = `distinction-summary.organization.name`,
     where = glue("{`distinction-summary.organization.address.city`}, 
                  {`distinction-summary.organization.address.country`}")
   ) %>% filter(when >= start_year)
+}
 ```
-
-&nbsp;
-
 
 # Funding
 
