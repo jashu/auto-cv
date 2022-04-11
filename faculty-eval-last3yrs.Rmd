@@ -21,7 +21,7 @@ library(glue) # provides syntactic sugar for pasting together strings
 library(rcrossref) # interfaces with CrossRef API 
                    # (IMPORTANT--current CRAN version DOES NOT WORK
                    #  Must install development version from GitHub)
-orcid <- "0000-0003-4655-436X"
+orcid <- params$orcid
 current_year <- as.integer(format(Sys.Date(), "%Y"))
 # Start CV 3 years prior to current year
 start_year <- current_year - 3L
