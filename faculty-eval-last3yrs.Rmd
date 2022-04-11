@@ -471,13 +471,12 @@ if(!is.null(fundings)){
     )
 }
 ```
-&nbsp;
 
 # Service
 
 ```{r service}
-if(!is.null(services)){
-  services %>%
+if(!is.null(service)){
+  service %>%
     detailed_entries(
       with = `service-summary.organization.name`,
       when = glue("{`service-summary.start-date.year.value`} -
