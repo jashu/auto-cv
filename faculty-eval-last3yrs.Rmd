@@ -248,6 +248,12 @@ if(nrow(articles) > 0){
     ) %>% map(format, style = "Bibtex")
   }
   pubs <- c(pubs3, ref)
+  pubs <- gsub("upepsilon", "epsilon", pubs)
+  pubs <- gsub("\\$\\\\less\\$/*scp\\$\\\\greater\\$", "", pubs)
+  pubs <- gsub("amp\\$\\\\mathsemicolon\\$", "", pubs)
+  pubs <- gsub(" de Barbaro ", " {de Barbaro} ", pubs)
+  pubs <- gsub(" de Barbaro}", " {de Barbaro}}", pubs)
+  pubs <- gsub("de~Barbaro", "{de Barbaro}", pubs)
   if("pubs.bib" %in% list.files()) unlink("pubs.bib")
   walk(pubs, write, file = "pubs.bib", append = TRUE)
   bibliography_entries("pubs.bib")
@@ -318,6 +324,9 @@ if(nrow(preprints) > 0){
     ) %>% map(format, style = "Bibtex")
   }
   pubs <- c(pubs3, ref)
+  pubs <- gsub("amp\\$\\\\mathsemicolon\\$", "", pubs)
+  pubs <- gsub(" de Barbaro ", " {de Barbaro} ", pubs)
+  pubs <- gsub(" de Barbaro}", " {de Barbaro}}", pubs)
   if("preprints.bib" %in% list.files()) unlink("preprints.bib")
   walk(pubs, write, file = "preprints.bib", append = TRUE)
   bibliography_entries("preprints.bib")
