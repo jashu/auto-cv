@@ -1,7 +1,7 @@
 ---
-name: "&nbsp;" # replace with your first name
-surname: "&nbsp;" # replace with your last name here
-email: "&nbsp;" # replace with your email
+name: "`r params$name`" # replace with your first name
+surname: "`r params$surname`" # replace with your last name here
+email: "`r params$email`" #`r params$email`" # replace with your email
 # the above fields must be included to avoid error; for additional ones that
 # you can include (e.g., position, address, profilepic, website) see the
 # "Introduction to vitae" vignette.
