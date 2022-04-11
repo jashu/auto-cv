@@ -425,7 +425,19 @@ all_works[talks,] %>%
 }
 ```
 
-&nbsp;
+# Conference Abstracts
+
+```{r abstracts}
+if(any(grepl("conference",types))){
+conf <- grepl("conference", types)
+all_works[conf,] %>%
+  detailed_entries(
+    with = `title.title.value`,
+    when = `publication-date.year.value`,
+    what = `journal-title.value`
+  )
+}
+```
 
 # Honors
 
