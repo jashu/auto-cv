@@ -51,9 +51,35 @@ if(!is.null(fundings)){
   fundings <- fundings %>% 
     reduce(bind_rows) %>%
     filter(`end-date.year.value` >= start_year)
+  if(nrow(fundings) == 0) fundings <- NULL
+}
+if(!is.null(fundings)){
+  if("external-ids.external-id" %in% names(fundings)){
+    no_external_id <- map_lgl(fundings$`external-ids.external-id`, is.null)
+    if(any(no_external_id)){
+      fundings$`external-ids.external-id`[no_external_id] <- map(
+      fundings$`external-ids.external-id`[no_external_id],
+      ~ list(`external-id-value` = "")
+      )
+    }
+  } else {
+    fundings$`external-ids.external-id` <- vector(
+      mode = "list",
+      length = nrow(fundings)
+    )
+    fundings$`external-ids.external-id` <- map(
+      fundings$`external-ids.external-id`,
+      ~ list(`external-id-value` = "")
+    )
+  }
   amounts <- map(fundings$`put-code`, ~ orcid_fundings(orcid, .x)) %>% 
     reduce(c) %>%
-   map_chr(~ dollar(as.integer(.x$amount$value)))
+    map_chr(
+      function(x){
+        x <- x$amount$value
+        if(is.null(x)) "" else dollar(as.integer(x))
+      }
+    )
   fundings <- fundings  %>%
     mutate(
       amount = amounts,
@@ -61,7 +87,6 @@ if(!is.null(fundings)){
       grantno = map_chr(grantno, ~ {if(is.null(.x)) "" else .x})
     )
 }
-  
 services <- pluck(
   activities, 1, "services", "affiliation-group", "summaries"
 ) 
