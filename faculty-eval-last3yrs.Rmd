@@ -90,10 +90,39 @@ if(!is.null(fundings)){
 services <- pluck(
   activities, 1, "services", "affiliation-group", "summaries"
 ) 
+service <- services
+mentoring <- NULL
+teaching <- NULL
 if(!is.null(services)){
-  services <- services %>% reduce(bind_rows) %>%
-  filter(`service-summary.end-date.year.value` >= start_year | 
-           is.na(`service-summary.end-date.year.value`))
+  services <- services %>% reduce(bind_rows)
+  if(!"service-summary.end-date.year.value" %in% names(services)){
+    services$`service-summary.end-date.year.value` <- NA
+  }
+  services <- services %>%
+    filter(
+      `service-summary.end-date.year.value` >= start_year |
+        is.na(`service-summary.end-date.year.value`)
+    )
+  services$`service-summary.end-date.year.value`[
+    is.na(services$`service-summary.end-date.year.value`)
+  ] <- "present"
+  mentor <- grepl(
+    "^Mentor", 
+    services$`service-summary.organization.name`, 
+    TRUE
+  ) & nchar(services$`service-summary.organization.name`) <= 10
+  teach <- grepl(
+    "^Teach", 
+    services$`service-summary.organization.name`, 
+    TRUE
+  ) & nchar(services$`service-summary.organization.name`) <= 10
+  service <- services[!(mentor | teach),]
+  if(any(mentor)){
+    mentoring <- services[mentor,]
+  }
+  if(any(teach)){
+    teaching <- services[teach,]
+  }
 }
 
 # For peer reviews, the ORCID query does not return name of journal, but rather
@@ -121,7 +150,6 @@ find_journal <- function(x){
   # both crossref and issn.org
 }
 ```
-
 
 # Publications
 
@@ -216,5 +244,35 @@ if(!is.null(services)){
 }
 ```
 
+# Mentoring and Teaching
+
+## Mentoring
+
+```{r mentoring}
+if(!is.null(mentoring)){
+  mentoring %>%
+    detailed_entries(
+      with = `service-summary.department-name`,
+      when = glue("{`service-summary.start-date.year.value`} -
+                  {`service-summary.end-date.year.value`}"),
+      what = `service-summary.role-title`
+    )
+}
+```
+&nbsp;
+
+## Teaching
+
+```{r teaching}
+if(!is.null(teaching)){
+  teaching %>%
+    detailed_entries(
+      with = `service-summary.department-name`,
+      when = glue("{`service-summary.start-date.year.value`} -
+                  {`service-summary.end-date.year.value`}"),
+      what = `service-summary.role-title`
+    )
+}
+```
 
 
