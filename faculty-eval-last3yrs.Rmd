@@ -325,6 +325,7 @@ if(nrow(preprints) > 0){
   }
   pubs <- c(pubs3, ref)
   pubs <- gsub("amp\\$\\\\mathsemicolon\\$", "", pubs)
+  pubs <- gsub("\\$\\\\less\\$[\\/]*i\\$\\\\greater\\$", "", pubs)
   pubs <- gsub(" de Barbaro ", " {de Barbaro} ", pubs)
   pubs <- gsub(" de Barbaro}", " {de Barbaro}}", pubs)
   if("preprints.bib" %in% list.files()) unlink("preprints.bib")
