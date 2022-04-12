@@ -339,6 +339,9 @@ if(nrow(preprints) > 0){
 ```{r books}
 if("book" %in% types){
   books <- all_works[types == "book",]
+  missing_publisher <- is.na(books$`journal-title.value`)
+  books$`journal-title.value`[missing_publisher] <- 
+    books$url.value[missing_publisher]
   bref <- map(
     1:nrow(books),
     ~ with(
