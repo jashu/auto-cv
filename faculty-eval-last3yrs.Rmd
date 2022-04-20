@@ -197,8 +197,10 @@ if(nrow(articles) > 0){
     )
     doi_articles <- doi_articles[!is.na(dois),]
     dois <- dois[!is.na(dois)]
-    doi_articles <- doi_articles[!duplicated(tolower(dois)),]
-    dois <- unique(tolower(dois))
+    dois <- tolower(dois)
+    dois <- gsub("^(https:\\/\\/)*doi.(org/)*", "", dois)
+    doi_articles <- doi_articles[!duplicated(dois),]
+    dois <- unique(dois)
     pubs <- cr_cn(dois, format = "bibtex")
     prob_pubs <- !grepl("journal =", pubs)
     if(any(prob_pubs) && "journal-title.value" %in% names(doi_articles)){
