@@ -48,7 +48,10 @@ render_report = function(orcid, email, path){
     )
   }
 }
-faculty <- read_csv(paste(path, "*Faculty ORCID IDs.csv", sep = ""))
+
+#change the green text in quotes to the name of the .csv file that contains
+#list of orcids and email addresses
+faculty <- read_csv(paste(path, "OrcidIDs.csv", sep = ""))
 walk2(
   faculty$OrcidID, 
   faculty$email,
